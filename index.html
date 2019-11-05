@@ -1,0 +1,109 @@
+<html>
+	<!-- stuff -->
+
+	<body>
+		<script type="text/javascript" src="https://files.mcneel.com/rhino3dm/js/latest/rhino3dm.js"></script>
+		<script type="text/javascript" src="https://files.mcneel.com/rhino3dm/js/latest/compute.rhino3d.js"></script>
+		<script type="text/javascript">
+			let _rhino3dm = null;
+
+			// wait for the rhino3dm web assembly to load asynchronously
+			rhino3dm().then(async m => {
+			  _rhino3dm = m; // global
+			  console.log("rhino3dm loaded!");
+			});
+		</script>
+		<script type="text/javascript" src="hiddenline.js"></script>
+
+		<script type="text/javascript" src="converters/mesh.js"></script>
+
+		<script type="text/javascript">
+	  	async function doIt()
+	  	{
+		  	var stream_id = "B1WfoGWfm";
+		  	var server = "https://hestia.speckle.works/api/v1";
+		  	var objects = null
+
+		  	await fetch(server + "/streams/" + stream_id + "/objects?omit=displayValue,base64,properties.texture_coordinates")
+	            .then(response => response.json())
+	            .then((data) => {
+	                objects = data.resources[0];
+	        })
+
+        	console.log(stream_id);
+        	console.log(server);
+
+        	let doc = new _rhino3dm.File3dm();
+
+    	    var res;
+    	    var segments = null;
+
+    	    var vp = new _rhino3dm.ViewportInfo();
+    	    vp.setCameraDirection([1, 0, 0]);
+    	    vp.setCameraLocation([-10000, 0, 0]);
+
+        	// Initialize RhinoCompute
+    	    RhinoCompute.authToken = RhinoCompute.getAuthToken();        	
+
+    	    HiddenLineDrawing.Parameters.new()
+    	    .then(result =>{
+    				console.log(result);
+    				return result;
+    	    })
+    	    .then(result =>
+    	    	HiddenLineDrawing.Parameters.setViewport(result, vp))
+	    	.then(result =>{
+	        	for(var i = 0; i < objects.length; ++i)
+	        	{
+	        		res = fromSpeckleMesh(objects[i]);
+	        		if (res != null)
+	        		{
+	        			HiddenLineDrawing.Parameters.addGeometry(result, res, null);
+	        			//doc.objects().add(res, null);
+	    			}
+	        	}
+    	    	console.log(result);
+
+	        	return result;
+    	    })
+    	    .then((result) => HiddenLineDrawing.compute(result))
+    		.then((result) => {
+    				console.log(result);
+    				return result;
+    		})
+        	.then(result =>{
+    	    	console.log(result);
+        		segments = HiddenLineDrawing.getSegments(result);
+    	    })
+    	    .then(result => {
+	        	if (segments != null && segments.length > 0) 
+	        	{
+		        	for (var i = 0; i < segments.length; ++i)
+		        	{
+		        		doc.objects().add(segments[i], null);
+		        	}
+
+					let buffer = doc.toByteArray();
+					saveByteArray("output.3dm", buffer);
+					doc.delete();	        	
+	        	}
+    	    });
+	    }
+
+		function saveByteArray(fileName, byte) {
+			let blob = new Blob([byte], {type: "application/octet-stream"});
+			let link = document.createElement('a');
+			link.href = window.URL.createObjectURL(blob);
+			link.download = fileName;
+			link.click();
+		};	    
+
+		</script>
+
+		<button type="button" onclick="doIt()">Try it</button>
+
+
+	</body>
+
+
+</html>
